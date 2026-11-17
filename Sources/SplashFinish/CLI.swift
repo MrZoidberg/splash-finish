@@ -4,17 +4,7 @@ import SplashFinishCore
 @MainActor enum CLI {
     /// Single source of truth is version.env, injected into Info.plist by package_app.sh.
     static var version: String {
-        // In a SwiftPM executable Bundle.main is not the .app bundle on every launch
-        // path (notably when called through the installed CLI symlink). Resolve the
-        // containing application bundle explicitly, then fall back to package metadata.
-        let main = Bundle.main
-        if let value = main.infoDictionary?["CFBundleShortVersionString"] as? String { return value }
-        let executable = URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL.resolvingSymlinksInPath()
-        let containingApp = executable.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        if containingApp.pathExtension == "app",
-           let appBundle = Bundle(url: containingApp),
-           let value = appBundle.infoDictionary?["CFBundleShortVersionString"] as? String { return value }
-        return "0.0.0-dev"
+        AppBundle.version
     }
     static let help = """
     Splash Finish \(version) — a landing strip for your AI agents
@@ -73,14 +63,10 @@ import SplashFinishCore
         subscript(_ name: String) -> String? { values["--" + name] }
     }
     static var executable: String {
-        // Finder/Launch Services can supply a bare argv[0], unrelated to the current directory.
-        if Bundle.main.bundleURL.pathExtension == "app", let url = Bundle.main.executableURL {
-            return url.standardizedFileURL.resolvingSymlinksInPath().path
-        }
-        return URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL.resolvingSymlinksInPath().path
+        AppBundle.executableURL.path
     }
     static func integrationInstaller() throws -> IntegrationInstaller {
-        guard let resources = Bundle.module.url(forResource: "Integrations", withExtension: nil) else {
+        guard let resources = AppBundle.resources()?.url(forResource: "Integrations", withExtension: nil) else {
             throw EventError.invalid("Integration resources are missing; reinstall the app")
         }
         return IntegrationInstaller(executable: executable, resources: resources)

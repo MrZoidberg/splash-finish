@@ -64,7 +64,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>LSMinimumSystemVersion</key><string>${MACOS_MIN_VERSION}</string>
     <key>LSUIElement</key><${LSUI_VALUE}/>
     <key>CFBundleIconFile</key><string>Icon</string>
-    <key>SUFeedURL</key><string>https://github.com/bobuk-io/splash-finish/releases/latest/download/appcast.xml</string>
+    <key>SUFeedURL</key><string>https://bobuk.io/apps/splash-finish/appcast.xml</string>
     <key>SUPublicEDKey</key><string>UgU/VhTFdMVMUUwDG2TYW+cvn6ruGpfsdI82c02GdrA=</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>

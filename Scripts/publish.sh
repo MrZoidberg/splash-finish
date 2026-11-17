@@ -10,14 +10,19 @@ TAG="v${MARKETING_VERSION}"
 ZIP="dist/SplashFinish-${MARKETING_VERSION}-universal.zip"
 SUMS="dist/SHA256SUMS"
 APPCAST="dist/appcast.xml"
+NOTES="docs/releases/${TAG}.md"
+LANDING=${LANDING:-"$ROOT/../landing"}
+SITE_FEED="$LANDING/public/apps/splash-finish/appcast.xml"
 
-for file in "$ZIP" "$SUMS" "$APPCAST"; do
+for file in "$ZIP" "$SUMS" "$APPCAST" "$NOTES"; do
   [[ -f "$file" ]] || {
     echo "Missing $file. Run Scripts/release.sh --notarize … and Scripts/make_appcast.sh first." >&2
     exit 1
   }
 done
 command -v gh >/dev/null || { echo "The GitHub CLI (gh) is required." >&2; exit 1; }
+[[ -d "$LANDING/public" ]] || { echo "No landing checkout at $LANDING; set LANDING." >&2; exit 1; }
+grep -q "sparkle:version>${BUILD_NUMBER}<" "$APPCAST" || { echo "Appcast build does not match version.env." >&2; exit 1; }
 
 [[ -z "$(git status --porcelain)" ]] || { echo "Commit changes before publishing." >&2; exit 1; }
 COMMIT=$(git rev-parse HEAD)
@@ -28,6 +33,20 @@ REMOTE_COMMIT=$(git ls-remote origin refs/heads/main | cut -f1)
 FEED=$(curl -fsSL --max-time 30 "https://github.com/${REPOSITORY}/releases/latest/download/appcast.xml")
 PUBLISHED=$(printf '%s' "$FEED" | grep -o 'sparkle:version>[0-9]*<' | head -1 | tr -dc '0-9')
 [[ -n "$PUBLISHED" ]] || { echo "Cannot read published build number." >&2; exit 1; }
+# During migration the site may not have a feed yet. Any failure other than
+# that initial 404 must stop publication, rather than hiding a newer site build.
+SITE_TMP=$(mktemp)
+trap 'rm -f "$SITE_TMP"' EXIT
+SITE_STATUS=$(curl -sS -L --max-time 30 -o "$SITE_TMP" -w '%{http_code}' \
+  "https://bobuk.io/apps/splash-finish/appcast.xml?v=$(date +%s)")
+case "$SITE_STATUS" in
+  200)
+    SITE_BUILD=$(grep -o 'sparkle:version>[0-9]*<' "$SITE_TMP" | head -1 | tr -dc '0-9')
+    [[ -n "$SITE_BUILD" ]] || { echo "Cannot read site feed build number." >&2; exit 1; }
+    if [[ "$SITE_BUILD" -gt "$PUBLISHED" ]]; then PUBLISHED=$SITE_BUILD; fi ;;
+  404) ;;
+  *) echo "Cannot check site feed: HTTP $SITE_STATUS." >&2; exit 1 ;;
+esac
 if [[ "$BUILD_NUMBER" -le "$PUBLISHED" ]]; then
   echo "BUILD_NUMBER=$BUILD_NUMBER must be greater than the published $PUBLISHED." >&2
   exit 1
@@ -40,7 +59,12 @@ fi
 # Upload all assets while hidden so Sparkle never observes an incomplete release.
 (cd dist && shasum -a 256 -c SHA256SUMS)
 gh release create "$TAG" --repo "$REPOSITORY" --target "$COMMIT" --draft \
-  --title "Splash Finish ${MARKETING_VERSION}" --generate-notes \
+  --title "Splash Finish ${MARKETING_VERSION}" --notes-file "$NOTES" \
   "$ZIP" "$SUMS" "$APPCAST"
 gh release edit "$TAG" --repo "$REPOSITORY" --draft=false --latest
-echo "Published $TAG. Sparkle clients will see it through releases/latest/download/appcast.xml."
+# Keep the GitHub appcast for 0.3.12 and older; new copies use bobuk.io.
+mkdir -p "$(dirname "$SITE_FEED")"
+cp "$APPCAST" "$SITE_FEED"
+echo "Published $TAG. Site feed ready: $SITE_FEED"
+bash "$ROOT/Scripts/update_homebrew.sh" --publish
+echo "Next: in $LANDING run npm run deploy, then verify https://bobuk.io/apps/splash-finish/appcast.xml."

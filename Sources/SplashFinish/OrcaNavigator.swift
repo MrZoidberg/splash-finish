@@ -53,7 +53,7 @@ import SplashFinishCore
     /// runtime client. That client is bundled with the installed app and needs a
     /// Node runtime, which Electron provides through ELECTRON_RUN_AS_NODE.
     private static func revealChat(_ session: String, app: URL, completion: @escaping (Bool) -> Void) {
-        guard let script = Bundle.module.url(forResource: "reveal-agent-session", withExtension: "js", subdirectory: "Orca"),
+        guard let script = AppBundle.resources()?.url(forResource: "reveal-agent-session", withExtension: "js", subdirectory: "Orca"),
               let executable = Bundle(url: app)?.executableURL,
               FileManager.default.isExecutableFile(atPath: executable.path) else { completion(false); return }
         let resources = app.appendingPathComponent("Contents/Resources")

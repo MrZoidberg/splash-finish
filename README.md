@@ -6,7 +6,22 @@ A little landing strip for AI agents. **Splash Finish** is a native macOS menu b
 
 ## 🚀 Install
 
-Requires **macOS 14 or later** on Apple silicon or Intel. No Python packages, Homebrew, Xcode, `sudo`, or notification permissions required. Python **3.10+** is needed for the installer.
+Requires **macOS 14 or later** on Apple silicon or Intel. Choose Homebrew or the standalone installer. Both use the same Developer ID signed, notarized universal app. Xcode and notification permissions are not required.
+
+### Homebrew
+
+```sh
+brew install --cask bobuk-io/tap/splash-finish
+open "/Applications/Splash Finish.app"
+```
+
+Homebrew installs the app and the `splash-finish` CLI. If it requests cask trust, run `brew trust --cask bobuk-io/tap/splash-finish` and repeat the install command.
+
+Keep one installation method. To move from the standalone installer, quit Splash Finish, remove only its old app in `~/Applications` and its old CLI symlink, then install with Homebrew. Keep `~/Library/Application Support/Splash Finish` to preserve the inbox. Run `splash-finish install-skills` afterward to refresh paths in agent integrations. Do not use `--force` to overwrite a different copy.
+
+### Standalone installer
+
+Python **3.10+** is required; no Python packages, Homebrew or `sudo` are needed.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/bobuk-io/splash-finish/main/install.py \
@@ -28,6 +43,14 @@ splash-finish install-skills
 - **pi:** use `/reload` in running sessions, or start a new one. Requires pi **1.5.0+** for the `agent_settled` and `ui_prompt_start` events.
 
 Installation of integrations is explicit. The app will not edit agent settings just because you opened it.
+
+## Updates
+
+A copy managed by Homebrew shows **Update Splash Finish via Homebrew…** in the menu. Sparkle is disabled for that copy. The action runs only `brew upgrade --cask --greedy bobuk-io/tap/splash-finish` with the owning Homebrew installation, shows live output and the actual result, and restarts the updated app. The progress window survives replacement of the app. Errors and cancellation are shown; closing the window does not cancel an update.
+
+You can also quit the app, run that command in Terminal, and reopen it. Other casks are not upgraded. Your inbox and agent integrations are retained.
+
+Standalone copies keep **Check for Updates…** and Sparkle updates from `https://bobuk.io/apps/splash-finish/appcast.xml`, with signed archives hosted on GitHub Releases. You can also rerun the standalone installer. Versions through 0.3.12 keep using the GitHub feed, which remains published for migration.
 
 ## ✨ Use
 
@@ -141,7 +164,7 @@ Question text and answers travel over a per-request local Unix socket in a user-
 
 ## 🔒 Local by default
 
-- No accounts, analytics, or servers operated by the app. Sparkle checks the public GitHub update feed, and the **installer** contacts GitHub.
+- No accounts or analytics. Standalone copies check the public update feed on bobuk.io and download signed archives from GitHub; the **installer** contacts GitHub. Homebrew-managed copies use Homebrew when you request an update. These services receive normal network request metadata; inbox contents are not sent.
 - The inbox is stored in `~/Library/Application Support/Splash Finish/state.json` with private file permissions. Event titles may contain short excerpts from the agent's final response; don't put secrets in them. Source URLs may also be persisted.
 - Hooks receive agent-supplied JSON locally, but the app does not store whole transcripts or tool inputs. Titles and details retain at most 4 KiB of UTF-8 text each for Markdown parsing; the compact panel shows only a preview. `status --raw` includes these retained excerpts. Markdown URLs are clickable only for `http`/`https`, without embedded credentials; images/HTML are never loaded.
 - Event payloads are bounded; malformed links and unsafe source URL schemes are rejected. Hook failures do not block the agent or approve permissions.
@@ -156,10 +179,14 @@ splash-finish uninstall-skills
 
 Quit Splash Finish from its menu. Remove `~/Applications/Splash Finish.app` and the `splash-finish` symlink from your local bin directory. If you also want to erase the inbox, remove `~/Library/Application Support/Splash Finish`. Existing hook backups are left beside the agent config files for you to inspect or remove.
 
+For a Homebrew installation, turn off **Start at Login**, run `splash-finish uninstall-skills`, quit the app, then run `brew uninstall --cask bobuk-io/tap/splash-finish`. This retains your data. Add `--zap` only to deliberately remove the inbox and app preferences; agent configuration backups are still retained.
+
 ## 🛠️ Development
 
 ```sh
 swift test
+bash Scripts/test_homebrew.sh       # offline cask publisher checks
+bash Scripts/test_publish.sh        # feed migration and publication ordering
 python3 -m unittest discover -s Tests -v
 node Tests/pi-extension.test.mjs       # Node 22.18+ for TypeScript stripping
 node Tests/pi-questions.test.mjs
@@ -191,9 +218,11 @@ The script waits for Apple's response, staples the ticket, checks Gatekeeper, an
 
 ### Sparkle updates
 
-The app embeds Sparkle 2.10.1 and checks the public `releases/latest/download/appcast.xml` feed.
+Standalone copies embed Sparkle 2.10.1 and check `https://bobuk.io/apps/splash-finish/appcast.xml`. Homebrew-managed copies never start Sparkle.
 
-Upload the three assets with `Scripts/publish.sh`: it refuses a build number that is not greater than the published one, refuses to reuse an existing tag, and creates the GitHub release with generated notes.
+Upload the three assets with `Scripts/publish.sh`: it checks both feeds for a lower published build number, refuses to reuse an existing tag, and creates the GitHub release with notes from `docs/releases/v<version>.md`. After publication it copies the signed feed to `../landing/public/apps/splash-finish/appcast.xml` (override with `LANDING`) and updates `bobuk-io/homebrew-tap/Casks/splash-finish.rb` using the published archive digest. Run `npm run deploy` in the landing checkout and verify the live feed to finish publication. Keep uploading the GitHub appcast for 0.3.12 and older clients.
+
+`bash Scripts/update_homebrew.sh` renders the cask locally. `bash Scripts/update_homebrew.sh --publish` creates or updates it in the tap, but only for a public, non-prerelease archive whose GitHub digest matches the local ZIP. This command can be retried if the tap update fails after release publication.
 
 The Ed25519 private signing key is stored in the macOS login Keychain under account `io.bobuk.splash-finish`. Back it up securely offline: losing it prevents the current app from verifying updates. Never commit or publish it. The public key is embedded in the app. On the signing machine, obtain the verified Sparkle 2.10.1 release tools and set `SPARKLE_BIN` to their `bin` directory, then after notarizing run:
 

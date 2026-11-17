@@ -35,7 +35,6 @@ private final class SplashPanel: NSPanel {
     private var panelSize = CGSize(width: 470, height: 350)
     private var integrationsWindow: NSWindow?
     private var settingsWindow: NSWindow?
-    private var updater: SPUStandardUpdaterController?
     private var hotKey: GlobalHotKey?
     private var pendingURLs = [URL]()
     private var observers = [NSObjectProtocol]()
@@ -73,9 +72,12 @@ private final class SplashPanel: NSPanel {
                 DispatchQueue.main.async { self?.resize(to: size) }
             }))
         model.onChange = { [weak self] reveal in self?.update(reveal: reveal) }
-        updater = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+        _ = UpdateService.shared
         hotKey = GlobalHotKey { [weak self] in self?.model.show() }
         makeMenu()
+        if let run = HomebrewUpdate.resultDirectory(in: CommandLine.arguments, base: HomebrewUpdateRunner.defaultBase) {
+            HomebrewUpdateWindowController.shared.showRun(run, role: .final)
+        }
         update(reveal: model.revealsAtLaunch)
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in self?.offerIntegrationUpdates() }
         let urls = pendingURLs; pendingURLs.removeAll()
@@ -233,7 +235,9 @@ private final class SplashPanel: NSPanel {
         menuItem("Settings…", #selector(showSettings), ",", in: menu)
         menuItem("Integrations…", #selector(showIntegrations), "i", in: menu)
         menu.addItem(.separator())
-        menuItem("Check for Updates…", #selector(checkForUpdates), in: menu)
+        if let title = UpdateService.shared.menuTitle {
+            menuItem(title, #selector(checkForUpdates), in: menu)
+        }
         menuItem("About Splash Finish", #selector(about), in: menu)
         menuItem("Quit Splash Finish", #selector(quit), "q", in: menu)
         statusItem.menu = menu
@@ -250,7 +254,7 @@ private final class SplashPanel: NSPanel {
         model.receive(AgentEvent(task: UUID().uuidString, agent: "Splash Finish", status: .done,
                                  title: "Your notifications are ready", detail: "Dismiss this one with ×", project: "welcome"))
     }
-    @objc private func checkForUpdates() { updater?.checkForUpdates(nil) }
+    @objc private func checkForUpdates() { UpdateService.shared.checkForUpdates() }
     @objc private func about() {
         NSApp.activate()
         NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "Splash Finish",

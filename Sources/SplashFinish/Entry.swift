@@ -5,7 +5,12 @@ import SplashFinishCore
 @main struct SplashFinishMain {
     @MainActor static func main() {
         let args = Array(CommandLine.arguments.dropFirst())
-        if !args.isEmpty && !args[0].hasPrefix("-psn_") {
+        if let run = HomebrewUpdate.resultDirectory(in: args, base: HomebrewUpdateRunner.defaultBase,
+                                                    argument: HomebrewUpdate.viewerArgument) {
+            HomebrewUpdateViewer.run(run)
+        }
+        let updateResult = HomebrewUpdate.resultDirectory(in: args, base: HomebrewUpdateRunner.defaultBase)
+        if updateResult == nil && !args.isEmpty && !args[0].hasPrefix("-psn_") {
             exit(CLI.run(args))
         }
         let app = NSApplication.shared
