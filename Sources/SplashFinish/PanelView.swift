@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import SplashFinishCore
+import BobukUI
 
 extension Color {
     init(hex: UInt32) {
@@ -173,10 +174,13 @@ struct InboxList<Content: View>: View {
         if model.items.isEmpty { return "We'll let you know when an agent needs you." }
         return "\(model.attention.count) \(model.attention.count == 1 ? "needs" : "need") attention · \(model.completed.count) completed"
     }
-    private var footnote: String {
-        if let message = model.message { return message }
-        if model.items.isEmpty { return "⌥⌘S opens this inbox from anywhere" }
-        return "↑↓ select · ⏎ open · ⌫ clear all · esc snooze 15 min"
+    private var pickerPalette: PickerPalette {
+        PickerPalette(surface: NSColor.theme(light: 0xF7F8F5, dark: 0x222A2E),
+                      text: NSColor(Color.panelInk), secondary: NSColor(Color.panelMuted),
+                      accent: NSColor(Color.panelAccent),
+                      border: NSColor.theme(light: contrast == .increased ? 0x46545B : 0xB3BEC1,
+                                            dark: contrast == .increased ? 0xA0B0B4 : 0x526064),
+                      badgeInk: .textColor)
     }
     private func group(_ label: String, items: [AgentEvent], color: Color) -> some View {
         VStack(alignment: .leading, spacing: 15) {
@@ -245,13 +249,15 @@ struct InboxList<Content: View>: View {
                 }.buttonStyle(QuietButtonStyle()).keyboardShortcut("w", modifiers: .command)
                     .help("Clear notifications; pending questions remain · Backspace or ⌘W")
             }.padding(.top, 17)
-            Text(footnote)
-                .font(.system(size: 10)).foregroundStyle(model.message == nil ? muted : Color.panelAccent)
-                .lineLimit(2).padding(.top, 13)
+            if let message = model.message {
+                Text(message).font(.system(size: 10)).foregroundStyle(Color.panelAccent)
+                    .lineLimit(2).padding(.top, 13)
+            } else {
+                ShortcutFooter(footerHints, palette: pickerPalette).padding(.top, 13)
+            }
         }.padding(25).frame(width: 470)
             .foregroundStyle(Color.theme(light: 0x222A2E, dark: 0xE9EEE9))
-            .background(Color.theme(light: 0xF7F8F5, dark: 0x222A2E), in: .rect(cornerRadius: 17))
-            .overlay(RoundedRectangle(cornerRadius: 17).strokeBorder(Color.theme(light: contrast == .increased ? 0x46545B : 0xB3BEC1, dark: contrast == .increased ? 0xA0B0B4 : 0x526064), lineWidth: 0.75))
+            .pickerPanel(palette: pickerPalette)
             .fixedSize(horizontal: true, vertical: true)
             .background(GeometryReader { proxy in
                 Color.clear.onChange(of: proxy.size, initial: true) { _, size in onSize(size) }
@@ -259,6 +265,11 @@ struct InboxList<Content: View>: View {
             // Native previews must move with their SwiftUI rows, not through a
             // separate removal animation while AppKit resizes the host window.
             .transaction { $0.animation = nil }
+    }
+    private var footerHints: [ShortcutHint] {
+        if model.items.isEmpty { return [.init("⌥⌘S", "opens this inbox from anywhere")] }
+        return [.init("↑↓", "select"), .init("⏎", "open"), .init("⌫", "clear all"),
+                .init("esc", "snooze 15 min")]
     }
     private var groups: some View {
         VStack(spacing: 22) {

@@ -18,16 +18,17 @@ import SplashFinishCore
     @ObservationIgnored private var persistTimer: Timer?
     @ObservationIgnored private let logger = Logger(subsystem: AppPaths.bundleID, category: "inbox")
 
-    init() {
-        state = StateFile(url: AppPaths.state)
+    init(stateURL: URL? = nil) {
+        let stateURL = stateURL ?? AppPaths.state
+        state = StateFile(url: stateURL)
         do { inbox = try state.load() }
         catch {
             message = "Could not restore the inbox. See Console for details."
             logger.error("State load failed: \(error.localizedDescription, privacy: .public)")
             // Preserve corrupt state instead of silently overwriting the only copy.
-            if FileManager.default.fileExists(atPath: AppPaths.state.path) {
-                try? SafeFiles.write(Data(contentsOf: AppPaths.state),
-                                     to: AppPaths.state.appendingPathExtension("unreadable-\(UUID().uuidString)"))
+            if FileManager.default.fileExists(atPath: stateURL.path) {
+                try? SafeFiles.write(Data(contentsOf: stateURL),
+                                     to: stateURL.appendingPathExtension("unreadable-\(UUID().uuidString)"))
             }
         }
         // Connections are ephemeral; discard stale placeholders after an app restart.

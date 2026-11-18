@@ -183,6 +183,16 @@ For a Homebrew installation, turn off **Start at Login**, run `splash-finish uni
 
 ## 🛠️ Development
 
+Splash Finish uses [BobukKit](https://github.com/bobuk-io/BobukKit) for the inbox
+window frame and wrapping shortcut hints. Notification cards, link hit targets,
+question forms and keyboard commands remain app-owned.
+
+BobukKit is a self-contained local package at `Vendor/BobukKit`. Do not edit that
+copy: change `~/GitHub/bobuk.io/BobukKit`, then run its `Scripts/sync.sh` and
+`Scripts/sync.sh --check` to update/check every registered app. Release EXTRA_TESTS
+checks snapshot hashes and runs the kit tests without a separate checkout.
+Build with Swift 6.2 or later (required by BobukKit).
+
 ```sh
 swift test
 bash Scripts/release/test_kit.sh    # offline release kit checks (publication order, feeds, cask, install)
