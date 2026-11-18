@@ -25,12 +25,16 @@ if [[ ${#ARCH_LIST[@]} -eq 0 ]]; then
   ARCH_LIST=("$HOST_ARCH")
 fi
 
+# The native build system writes each architecture to .build/<arch>-apple-macosx/, the paths read below;
+# Swift Build, the default from Swift 6.3 on, writes every architecture to .build/out/ instead.
 for ARCH in "${ARCH_LIST[@]}"; do
-  swift build -c "$CONF" --arch "$ARCH"
+  swift build -c "$CONF" --arch "$ARCH" --build-system native
 done
 
 mkdir -p "$ROOT/build"
-APP="$ROOT/build/Splash Finish.app"
+OUTPUT_DIR=${APP_OUTPUT_DIR:-"$ROOT/build"}
+mkdir -p "$OUTPUT_DIR"
+APP="$OUTPUT_DIR/Splash Finish.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 
@@ -131,6 +135,11 @@ install_binary() {
 }
 
 install_binary "$APP_NAME" "$APP/Contents/MacOS/$APP_NAME"
+if [[ "$CONF" == release ]]; then
+  # Remove STABS/debug-map object paths (local home and build paths) before signing.
+  # Runtime Swift metadata and symbols required by the executable are preserved.
+  xcrun strip -S "$APP/Contents/MacOS/$APP_NAME"
+fi
 
 # Bundle app resources (if any).
 APP_RESOURCES_DIR="$ROOT/Sources/$APP_NAME/Resources"

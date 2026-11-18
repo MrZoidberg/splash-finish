@@ -185,8 +185,7 @@ For a Homebrew installation, turn off **Start at Login**, run `splash-finish uni
 
 ```sh
 swift test
-bash Scripts/test_homebrew.sh       # offline cask publisher checks
-bash Scripts/test_publish.sh        # feed migration and publication ordering
+bash Scripts/release/test_kit.sh    # offline release kit checks (publication order, feeds, cask, install)
 python3 -m unittest discover -s Tests -v
 node Tests/pi-extension.test.mjs       # Node 22.18+ for TypeScript stripping
 node Tests/pi-questions.test.mjs
@@ -201,36 +200,22 @@ The app icon is **Landing Signal** (three raised amber bars on slate). Editable 
 
 `version.env` is the single source of truth for the release version: `Scripts/package_app.sh` embeds it in `Info.plist`, the app reads it back for `--version`, and CI verifies the built bundle against the file.
 
-Create a **universal** release with an available Developer ID identity:
+### Release
+
+Releases use the shared bobuk.io release kit in [`Scripts/release`](Scripts/release/README.md), the same scheme as Ting and HAScS. App facts live in `release.env`. Write `docs/releases/v<next version>.md`, commit the landing copy for the release, then run:
 
 ```sh
-APP_IDENTITY='Developer ID Application: YOUR NAME (TEAMID)' Scripts/release.sh
+APP_IDENTITY='Developer ID Application: YOUR NAME (TEAMID)' NOTARY_PROFILE=YOUR_NOTARY_PROFILE \
+  Scripts/release_next.sh
 ```
 
-This produces `build/Splash Finish.app`, `dist/SplashFinish-<version>-universal.zip`, and `dist/SHA256SUMS`. The signing identity used by the installer is pinned to the project's Developer ID team; update `TEAM_ID` in `install.py` if the project changes hands. A build without notarization will not pass Gatekeeper on a downloaded file. For a distributable notarized build, configure a `notarytool` keychain profile and run:
-
-```sh
-APP_IDENTITY='Developer ID Application: YOUR NAME (TEAMID)' \
-  Scripts/release.sh --notarize YOUR_NOTARY_PROFILE
-```
-
-The script waits for Apple's response, staples the ticket, checks Gatekeeper, and regenerates the ZIP and checksum. It never creates a GitHub release on its own.
+It raises the patch version and `BUILD_NUMBER`, runs the Swift, installer and pi tests in the background while it builds, checks, notarizes and staples the universal app, signs the Sparkle appcast, installs the release in `~/Applications` and restarts it, commits and pushes, publishes the GitHub release (with `SplashFinish-<version>-universal.zip`, `SHA256SUMS` and the GitHub `appcast.xml` for 0.3.12 and older), updates `bobuk-io/homebrew-tap/Casks/splash-finish.rb` from the published archive digest, deploys the landing site with the feed and checks `https://bobuk.io/apps/splash-finish/appcast.xml`. After a failure, run the same command again. `Scripts/release/doctor.sh` checks readiness without changing anything. The signing identity used by the installer is pinned to the project's Developer ID team; update `TEAM_ID` in `install.py` if the project changes hands.
 
 ### Sparkle updates
 
 Standalone copies embed Sparkle 2.10.1 and check `https://bobuk.io/apps/splash-finish/appcast.xml`. Homebrew-managed copies never start Sparkle.
 
-Upload the three assets with `Scripts/publish.sh`: it checks both feeds for a lower published build number, refuses to reuse an existing tag, and creates the GitHub release with notes from `docs/releases/v<version>.md`. After publication it copies the signed feed to `../landing/public/apps/splash-finish/appcast.xml` (override with `LANDING`) and updates `bobuk-io/homebrew-tap/Casks/splash-finish.rb` using the published archive digest. Run `npm run deploy` in the landing checkout and verify the live feed to finish publication. Keep uploading the GitHub appcast for 0.3.12 and older clients.
-
-`bash Scripts/update_homebrew.sh` renders the cask locally. `bash Scripts/update_homebrew.sh --publish` creates or updates it in the tap, but only for a public, non-prerelease archive whose GitHub digest matches the local ZIP. This command can be retried if the tap update fails after release publication.
-
-The Ed25519 private signing key is stored in the macOS login Keychain under account `io.bobuk.splash-finish`. Back it up securely offline: losing it prevents the current app from verifying updates. Never commit or publish it. The public key is embedded in the app. On the signing machine, obtain the verified Sparkle 2.10.1 release tools and set `SPARKLE_BIN` to their `bin` directory, then after notarizing run:
-
-```sh
-SPARKLE_BIN=/path/to/Sparkle/bin Scripts/make_appcast.sh
-```
-
-Upload `dist/appcast.xml`, the ZIP, and `SHA256SUMS` together to the corresponding GitHub release. Each release needs a higher `BUILD_NUMBER`. `Scripts/make_appcast.sh` verifies the Keychain public key and signs the final archive; do not modify the archive after generating its signature. The public release feed and archives are accessible to Sparkle without authentication.
+The Ed25519 private signing key is stored in the macOS login Keychain under account `io.bobuk.splash-finish`. Back it up securely offline: losing it prevents the current app from verifying updates. Never commit or publish it. The public key is embedded in the app and in `release.env`. On the signing machine, put the verified Sparkle 2.10.1 release tools in `.build/sparkle-tools/bin` or set `SPARKLE_BIN` to their `bin` directory. Never modify the archive after the appcast signed it.
 
 ---
 
