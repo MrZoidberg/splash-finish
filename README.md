@@ -130,7 +130,7 @@ Deep links are not authenticated: any local app can send them. They display boun
 
 ```sh
 splash-finish install-skills                 # all agents
-splash-finish install-skills --agent copilot # claude | codex | copilot | pi
+splash-finish install-skills --agent pi      # claude | codex | copilot | pi
 splash-finish uninstall-skills               # remove all Splash Finish integrations
 splash-finish uninstall-skills --agent codex
 ```
@@ -144,7 +144,7 @@ splash-finish uninstall-skills --agent codex
 
 Pi notifications are fire-and-forget and never delay the agent. User-opened menus while Pi is idle (such as `/jewter`) do not trigger attention notifications or clear completed items; blocking dialogs during an active agent run still report requests for input. Subagent sessions (pi-subagents background children and in-process `run-N` sessions) are filtered: only requests for input are forwarded, so a fan-out of workers does not flood the inbox.
 
-Copilot reports “Agent turn ended” without reading the answer or transcript. A turn can end while background work is still running; a later turn produces another notification. Only `permission_prompt` and `elicitation_dialog` notifications request attention; background notifications and subagent events are ignored. Tool completions cannot identify which question was resolved, so attention remains until a new prompt, turn end, or session end. Notifications are asynchronous. Documented event timestamps prevent older events from replacing newer ones when both timestamps are available; missing timestamps and events sharing a millisecond can still race. Copilot CLI 1.0.114 has been exercised with interactive completion and elicitation hooks and a custom `COPILOT_HOME`; no minimum supported version is established. Disabled hooks and session sandbox restrictions can prevent delivery.
+Copilot reports “Agent turn ended” without reading the answer or transcript. A turn can end while background work is still running; a later turn produces another notification. Only `permission_prompt` and `elicitation_dialog` notifications request attention; background notifications and subagent events are ignored. Tool completions cannot identify which question was resolved, so attention remains until a new prompt, turn end, or session end.
 
 Set `SPLASH_FINISH_DISABLED=1` in managed worker processes (for example pi-selecta workers) to suppress their lifecycle hooks, rich questions and explicit `notify` calls. Leave it unset in the coordinator so only the coordinator asks the human and reports completion. Available in 0.3.8 and later. Pi integrations, installed hook shell guards, and the CLI honor this opt-out. After updating, reinstall integrations with `splash-finish install-skills` and run `/reload` in existing Pi sessions.
 
